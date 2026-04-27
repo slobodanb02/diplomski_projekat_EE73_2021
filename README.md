@@ -1,8 +1,10 @@
 PilotProject: Instrument Calibration Manager
-PilotProject is a desktop application built with PySide6 (Qt for Python) designed to manage measuring instrument certifications. It allows technicians to track devices and manage calibration data via a dynamic, spreadsheet-style editor.
+PilotProject is a desktop application built with PySide6 (Qt for Python) designed to manage measuring instrument certifications. 
+It allows technicians to track devices and manage calibration data via a dynamic, spreadsheet-style editor.
 
 📂 Project Architecture
-    The project follows a Separated Concerns architecture to ensure the code is maintainable and scalable:
+
+The project follows a Separated Concerns architecture to ensure the code is maintainable and scalable:
 
     main.py: The application entry point. It initializes the UI and connects user actions to the underlying logic.
 
@@ -15,6 +17,7 @@ PilotProject is a desktop application built with PySide6 (Qt for Python) designe
     Certificates/: The local storage directory where each instrument is saved as a unique .json file.
 
 🚀 Key Features
+
     1️⃣ Dynamic Spreadsheet Editor
         The CertEditDialog generates tables on the fly. Users can organize data by Year and Property, ensuring a clean history for every device.
 
@@ -28,17 +31,26 @@ PilotProject is a desktop application built with PySide6 (Qt for Python) designe
         The application doesn't just save numbers; it saves the structure. When a user customizes a table layout, the specific headers and column counts are stored in the JSON, so the editor looks exactly the same when re-opened.
 
 🛠 Installation
-Requirement: Python 3.10+
-Dependencies: "requirements.txt", Standard Python 3.14 libraries.
 
-📋"Requirements.txt": 
+Requirement:
+    
+    Python 3.10+
+
+Dependencies: 
+    
+    "requirements.txt", Standard Python 3.14 libraries.
+
+📋"Requirements.txt":
+
     PySide6==6.11.0
     PySide6_Addons==6.11.0
     PySide6_Essentials==6.11.0
     shiboken6==6.11.0
 
 To install required dependencies, open your terminal and run following command:
+
     pip install -r requirements.txt
 
 🛠 Technical Note for Developers
-To add new measurement parameters to the selection menu, simply update the AVAILABLE_COLUMNS list at the top of GUI.py. The UI will automatically update the right-click menus across the entire application.
+    
+    To add new measurement parameters to the selection menu, simply update the AVAILABLE_COLUMNS list at the top of GUI.py. The UI will automatically update the right-click menus across the entire application.
