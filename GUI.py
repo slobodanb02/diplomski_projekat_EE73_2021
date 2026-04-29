@@ -1,10 +1,8 @@
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, 
+from PySide6.QtWidgets import (QMainWindow, QWidget, 
                              QVBoxLayout, QHBoxLayout, QGridLayout, 
                              QTreeWidget, QPushButton,
-                             QGroupBox, QFrame, QDialog, QMenu, QInputDialog, QTextEdit, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget, QTabBar, QLineEdit, QLabel)
+                             QGroupBox, QFrame, QDialog, QMenu, QInputDialog, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget, QTabBar, QLineEdit, QLabel)
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
-import os
 import data_manager
 AVAILABLE_COLUMNS = [
     "Range", "Measured Value", "Reference Value", 

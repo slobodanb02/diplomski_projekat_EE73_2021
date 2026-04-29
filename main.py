@@ -1,7 +1,5 @@
 import sys
-import os
-import shutil
-from PySide6.QtWidgets import QApplication, QMessageBox, QFileDialog
+from PySide6.QtWidgets import QApplication
 from GUI import MainWindowUI
 import data_manager
 import button_functions
