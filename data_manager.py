@@ -96,3 +96,17 @@ def save_certificate(file_path, data):
     except Exception as e:
         print(f"Save Error: {e}")
         return False
+
+def analyze_certificate(file_path):
+    cert_data = load_certificate(file_path)
+    extracted_names = {}
+
+    if not cert_data or "years" not in cert_data:
+        return {}
+    
+    for entry in cert_data["years"]:
+        year_name = entry.get("name")
+        if year_name:
+            extracted_names[year_name] = entry
+            
+    return extracted_names

@@ -15,6 +15,7 @@ class AppLogic(MainWindowUI):
         self.btn_add.clicked.connect(self.handle_add)
         self.btn_edit.clicked.connect(self.handle_edit)
         self.btn_close.clicked.connect(self.handle_delete)
+        self.btn_display_data.clicked.connect(self.handle_display)
 
     def populate_list(self):
         data_manager.scan_and_populate_list(self.tree, self.files_path)
@@ -27,6 +28,9 @@ class AppLogic(MainWindowUI):
 
     def handle_delete(self):
         button_functions.delete_existing_certificate(self, self.tree, self.files_path)
+
+    def handle_display(self):
+        button_functions.display_certificate_data(self, self.tree, self.files_path)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

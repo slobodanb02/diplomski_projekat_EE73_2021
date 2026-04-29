@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, 
                              QVBoxLayout, QHBoxLayout, QGridLayout, 
                              QTreeWidget, QPushButton,
-                             QGroupBox, QFrame, QDialog, QMenu, QInputDialog, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget, QTabBar, QLineEdit, QLabel)
+                             QGroupBox, QFrame, QDialog, QMenu, QInputDialog, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget, QTabBar, QLineEdit, QLabel, QComboBox)
 from PySide6.QtCore import Qt
 import data_manager
 AVAILABLE_COLUMNS = [
@@ -14,7 +14,7 @@ class MainWindowUI(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("PilotProject")
-        self.setFixedSize(1000, 600)
+        self.setFixedSize(600, 600)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -31,6 +31,8 @@ class MainWindowUI(QMainWindow):
         self.tree.setHeaderLabels(["TYPE", "SN"])
         self.tree.setFixedHeight(400)
         self.tree.header().setStretchLastSection(True)
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setSelectionMode(QTreeWidget.SingleSelection)
         panel_layout.addWidget(self.tree)
 
         button_grid = QGridLayout()
@@ -46,7 +48,13 @@ class MainWindowUI(QMainWindow):
         master_layout.addWidget(self.left_panel)
 
         self.right_container = QFrame() 
-        self.right_container.setStyleSheet("background-color: #1e1e1e; border-radius: 5px;")
+        right_layout = QVBoxLayout(self.right_container)
+        right_layout.setContentsMargins(10, 20, 10, 20)
+        right_layout.setAlignment(Qt.AlignCenter)
+
+        self.btn_display_data = QPushButton("Display data")
+        self.btn_display_data.setMinimumSize(150, 40)
+        right_layout.addWidget(self.btn_display_data)
         master_layout.addWidget(self.right_container, stretch=1)
 
 class CertEditDialog(QDialog):
@@ -295,3 +303,49 @@ class CertificateDialog(QDialog):
     def handle_import(self):
         self.import_existing = True
         self.accept()
+
+class DisplayDataDialog(QDialog):
+    def __init__(self, file_path, parent=None):
+        super().__init__(parent)
+        
+        self.setWindowTitle(f"Certificate Analysis: {file_path}")
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)
+
+        self.label = QLabel("Select a year to display:")
+        layout.addWidget(self.label)
+
+        self.combo_years = QComboBox()
+        layout.addWidget(self.combo_years)
+        layout.addSpacing(40)
+
+        self.btn_confirm = QPushButton("View Data")
+        self.btn_confirm.clicked.connect(self.handle_selection)
+        layout.addWidget(self.btn_confirm)
+
+        layout.addSpacing(10)
+
+        self.btn_close = QPushButton("Cancel")
+        self.btn_close.clicked.connect(self.reject)
+        layout.addWidget(self.btn_close)
+
+        self.run_analysis(file_path)
+        ideal_size = self.sizeHint()
+        self.setFixedSize(500, ideal_size.height())
+
+    def run_analysis(self, file_path):
+        analysis_results = data_manager.analyze_certificate(file_path)
+
+        if not analysis_results:
+            self.combo_years.addItem("No data found")
+            self.combo_years.setEnabled(False)
+            return
+
+        names = sorted(analysis_results.keys())
+        self.combo_years.addItems(names)
+
+    def handle_selection(self):
+        selected_year = self.combo_years.currentText()
+        print(f"User selected: {selected_year}")
+        self.accept()
+
