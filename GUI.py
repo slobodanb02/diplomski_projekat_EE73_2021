@@ -312,11 +312,33 @@ class DisplayDataDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(0)
 
+        self.cert_data = data_manager.fetch_certificate_data(file_path)
+
         self.label = QLabel("Select a year to display:")
         layout.addWidget(self.label)
 
         self.combo_years = QComboBox()
         layout.addWidget(self.combo_years)
+        layout.addSpacing(10)
+
+        self.label_prop = QLabel("Select a property:")
+        layout.addWidget(self.label_prop)
+
+        self.combo_properties = QComboBox()
+        layout.addWidget(self.combo_properties)
+        layout.addSpacing(10)
+
+        self.label_header = QLabel("Select a header:")
+        layout.addWidget(self.label_header)
+
+        self.combo_headers = QComboBox()
+        layout.addWidget(self.combo_headers)
+        layout.addSpacing(10)
+
+        self.label_value = QLabel("Select a value:")
+        layout.addWidget(self.label_value)
+        self.combo_values = QComboBox()
+        layout.addWidget(self.combo_values)
         layout.addSpacing(40)
 
         self.btn_confirm = QPushButton("View Data")
@@ -329,23 +351,100 @@ class DisplayDataDialog(QDialog):
         self.btn_close.clicked.connect(self.reject)
         layout.addWidget(self.btn_close)
 
-        self.run_analysis(file_path)
+        self.combo_years.currentTextChanged.connect(self.display_properties)
+        self.combo_properties.currentTextChanged.connect(self.display_headers)
+        self.combo_headers.currentTextChanged.connect(self.display_values)
+
+        self.display_years(file_path)
         ideal_size = self.sizeHint()
         self.setFixedSize(500, ideal_size.height())
 
-    def run_analysis(self, file_path):
-        analysis_results = data_manager.analyze_certificate(file_path)
-
-        if not analysis_results:
+    def display_years(self, file_path):
+        if not self.cert_data:
             self.combo_years.addItem("No data found")
             self.combo_years.setEnabled(False)
+            self.combo_properties.setEnabled(False)
+            self.combo_headers.setEnabled(False)
             return
 
-        names = sorted(analysis_results.keys())
+        names = sorted(self.cert_data.keys())
         self.combo_years.addItems(names)
+
+    def display_properties(self, selected_year):
+        self.combo_properties.clear()
+
+        year_entry = self.cert_data.get(selected_year, {})
+        properties_list = year_entry.get("properties", [])
+        property_names = [prop.get("name") for prop in properties_list if "name" in prop]
+
+        if property_names:
+            self.combo_properties.addItems(property_names)
+        else:
+            self.combo_properties.addItem("No properties found")
+
+    def display_headers(self, selected_property):
+        self.combo_headers.clear()
+
+        if not selected_property or selected_property == "No properties found":
+             return 
+        
+        selected_year = self.combo_years.currentText()
+        year_entry = self.cert_data.get(selected_year, {})
+        properties_list = year_entry.get("properties", [])
+
+        target_property = next((prop for prop in properties_list if prop.get("name") == selected_property), None)
+
+        if target_property:
+            headers = target_property.get("headers", [])
+            if headers:
+                self.combo_headers.addItems(headers)
+            else:
+                self.combo_headers.addItem("No headers found")
+
+    def display_values(self, selected_header):
+        """Populates the values combobox based on the selected header column."""
+        self.combo_values.clear()
+
+        if not selected_header or selected_header == "No headers found":
+            return
+
+        selected_year = self.combo_years.currentText()
+        selected_property = self.combo_properties.currentText()
+
+        unique_values = data_manager.get_unique_column_values(
+            self.cert_data, 
+            selected_year, 
+            selected_property, 
+            selected_header
+        )
+
+        if unique_values:
+            self.combo_values.addItems(unique_values)
+        else:
+            self.combo_values.addItem("No values found")
 
     def handle_selection(self):
         selected_year = self.combo_years.currentText()
-        print(f"User selected: {selected_year}")
+        selected_property = self.combo_properties.currentText()
+        selected_header = self.combo_headers.currentText()
+        selected_value = self.combo_values.currentText()
+
+        print(f"User selected: {selected_year}, {selected_property}, {selected_header}")
+
+        matching_row = data_manager.find_matching_row(
+            self.cert_data, 
+            selected_year, 
+            selected_property, 
+            selected_header, 
+            selected_value
+        )
+
+        if matching_row:
+            print(f"--- MATCHING ROW FOUND ---")
+            print(matching_row)
+        else:
+            print("No matching row found in the data.")
+
+        # 4. Close the dialog
         self.accept()
 

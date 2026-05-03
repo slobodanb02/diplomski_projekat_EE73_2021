@@ -97,9 +97,9 @@ def save_certificate(file_path, data):
         print(f"Save Error: {e}")
         return False
 
-def analyze_certificate(file_path):
+def fetch_certificate_data(file_path):
     cert_data = load_certificate(file_path)
-    extracted_names = {}
+    extracted_years = {}
 
     if not cert_data or "years" not in cert_data:
         return {}
@@ -107,6 +107,55 @@ def analyze_certificate(file_path):
     for entry in cert_data["years"]:
         year_name = entry.get("name")
         if year_name:
-            extracted_names[year_name] = entry
+            extracted_years[year_name] = entry
             
-    return extracted_names
+    return extracted_years
+
+def get_unique_column_values(cert_data, year, property_name, header):
+    year_entry = cert_data.get(year, {})
+    properties_list = year_entry.get("properties", [])
+    target_property = next((prop for prop in properties_list if prop.get("name") == property_name), None)
+
+    if not target_property:
+        return []
+
+    headers = target_property.get("headers", [])
+    data_matrix = target_property.get("data", [])
+
+    if header not in headers:
+        return []
+
+    col_index = headers.index(header)
+    
+    column_values = []
+    for row in data_matrix:
+        if col_index < len(row): 
+            val = str(row[col_index]).strip()
+            if val:  # Ignore empty string entries
+                column_values.append(val)
+
+    unique_values = list(dict.fromkeys(column_values))
+    
+    return unique_values
+
+def find_matching_row(cert_data, year, property_name, header, value):
+    year_entry = cert_data.get(year, {})
+    properties_list = year_entry.get("properties", [])
+    target_property = next((prop for prop in properties_list if prop.get("name") == property_name), None)
+
+    if not target_property:
+        return None
+
+    headers = target_property.get("headers", [])
+    data_matrix = target_property.get("data", [])
+
+    if header not in headers:
+        return None
+
+    col_index = headers.index(header)
+    
+    for row in data_matrix:
+        if col_index < len(row) and str(row[col_index]).strip() == value:
+            return row
+            
+    return None
