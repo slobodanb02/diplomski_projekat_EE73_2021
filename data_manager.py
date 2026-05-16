@@ -191,7 +191,21 @@ def _clean_numeric_value(raw_value):
 
 def _process_row_data(headers, raw_row_list):
     row_dict = dict(zip(headers, raw_row_list))
-    return {key: _clean_numeric_value(val) for key, val in row_dict.items()}
+    processed = {}
+    units = {}
+    
+    for key, val in row_dict.items():
+        processed[key] = _clean_numeric_value(val)
+        
+        unit = ""
+        if isinstance(val, str):
+            match = re.search(r'[-+]?\d*\.?\d+\s*(.*)', val.strip())
+            if match and match.group(1):
+                unit = match.group(1).strip()
+        units[key] = unit
+
+    processed["_units"] = units
+    return processed
 
 
 def _find_row_in_property(target_property, filter_header, filter_value):

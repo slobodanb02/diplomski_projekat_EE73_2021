@@ -6,13 +6,13 @@ from matplotlib.figure import Figure
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QPushButton
 
 class ErrorGraphDialog(QDialog):
-    def __init__(self, graph_data, error_col_name, uncert_col_name, parent=None):
+    def __init__(self, graph_data,property_name, error_col_name, uncert_col_name, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Historical Error & Uncertainty Analysis")
         self.resize(800, 500)
         
         self.graph_data = graph_data 
-        
+        self.property_name = property_name
         self.error_col_name = error_col_name
         self.uncert_col_name = uncert_col_name
         
@@ -33,21 +33,52 @@ class ErrorGraphDialog(QDialog):
         
         years = sorted(self.graph_data.keys())
         
+        error_unit = ""
+        uncert_unit = ""
+        
+        for year in years:
+            units_dict = self.graph_data[year].get("_units", {})
+            if units_dict.get(self.error_col_name):
+                error_unit = units_dict[self.error_col_name]
+            if units_dict.get(self.uncert_col_name):
+                uncert_unit = units_dict[self.uncert_col_name]
+                
+        err_unit_str = f" {error_unit}" if error_unit else ""
+        uncert_unit_str = f" {uncert_unit}" if uncert_unit else ""
+        
         errors = [self.graph_data[year].get(self.error_col_name, 0.0) for year in years]
         uncertainties = [self.graph_data[year].get(self.uncert_col_name, 0.0) for year in years]
-
+        
         ax.errorbar(years, errors, yerr=uncertainties, fmt='o', 
-                    color='#d62728',
-                    ecolor='#1f77b4',
-                    elinewidth=3,
-                    capsize=6,
-                    markersize=8,
-                    linestyle='dashed',
-                    linewidth=1)
-
-        ax.set_title("Measurement Error & Uncertainty Over Time", fontsize=14, fontweight='bold')
+                    color='#d62728', ecolor='#1f77b4', elinewidth=3, 
+                    capsize=6, markersize=8, linestyle='none', linewidth=1)
+        
+        for i, year in enumerate(years):
+            err_val = errors[i]
+            uncert_val = uncertainties[i]
+            display_text = f"± {uncert_val}{uncert_unit_str}"
+            
+            ax.annotate(display_text, 
+                        (year, err_val), 
+                        textcoords="offset points", 
+                        xytext=(15, 0),     
+                        ha='left',
+                        va='center',        
+                        fontsize=10, 
+                        fontweight='bold',
+                        color='#333333')
+        
+        ax.set_title(f"{self.property_name} Measurement Error & Uncertainty Over Time", fontsize=14, fontweight='bold')
         ax.set_xlabel("Calibration Year", fontsize=12)
-        ax.set_ylabel(f"{self.error_col_name} ± {self.uncert_col_name}", fontsize=12)
+        
+        ylabel = f"{self.error_col_name}"
+        if error_unit:
+            ylabel += f" ({error_unit})"
+        ylabel += f" ± {self.uncert_col_name}"
+        if uncert_unit:
+            ylabel += f" ({uncert_unit})"
+            
+        ax.set_ylabel(ylabel, fontsize=12)
         ax.grid(True, linestyle='--', alpha=0.7)
         
         self.figure.tight_layout()

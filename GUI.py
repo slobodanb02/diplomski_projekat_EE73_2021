@@ -499,6 +499,7 @@ class DisplayDataDialog(QDialog):
         if self.final_graph_data:
             graph_dialog = graph_view.ErrorGraphDialog(
                 graph_data=self.final_graph_data, 
+                property_name=target_prop,
                 error_col_name="Error",
                 uncert_col_name="Error Uncertanty",
                 parent=self
