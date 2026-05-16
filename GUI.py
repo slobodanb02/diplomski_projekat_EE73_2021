@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget,
                              QGroupBox, QFrame, QDialog, QMenu, QInputDialog, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget, QTabBar, QLineEdit, QLabel, QComboBox)
 from PySide6.QtCore import Qt
 import data_manager
+import graph_view
 AVAILABLE_COLUMNS = [
     "Range", "Measured Value", "Reference Value", 
     "Frequency", "Error", "Error Uncertainty"  
@@ -79,7 +80,7 @@ class CertEditDialog(QDialog):
         
         self.btn_save.setStyleSheet("background-color: #2e7d32; color: white; font-weight: bold;")
         
-        self.btn_add_year.clicked.connect(lambda: self.add_year())
+        self.btn_add_year.clicked.connect(self.handle_add_and_rename_year)
         self.btn_add_property.clicked.connect(self.add_property_to_current_year)
         self.btn_save.clicked.connect(self.save_to_json)
         
@@ -88,16 +89,15 @@ class CertEditDialog(QDialog):
         self.controls.addStretch()
         self.controls.addWidget(self.btn_save)
         
-
         self.main_layout.addLayout(self.controls)
         self.main_layout.addWidget(self.year_tabs)
 
         if not self.load_from_json():
             self.add_year()
         
-
     def save_to_json(self):
-        full_data = {"years": []}
+        raw_years_ui_list = []
+        
         for i in range(self.year_tabs.count()):
             year_name = self.year_tabs.tabText(i)
             inner_tabs = self.year_tabs.widget(i).findChild(QTabWidget)
@@ -119,19 +119,21 @@ class CertEditDialog(QDialog):
                         "headers": headers,
                         "data": table_data
                     })
-            full_data["years"].append(year_entry)
+            raw_years_ui_list.append(year_entry)
 
-        if data_manager.save_certificate(self.file_path, full_data):
-            QMessageBox.information(self, "Saved", "Changes saved to disk.")
+        if data_manager.prepare_and_save_certificate_data(self.file_path, raw_years_ui_list):
+            QMessageBox.information(self, "Saved", "Changes saved to disk successfully.")
 
     def load_from_json(self):
         content = data_manager.load_certificate(self.file_path)
         if not content or "years" not in content:
             return False
 
+        self.year_tabs.clear()
+
         for year_data in content["years"]:
-            year_container, inner_tabs = self.add_year(year_data["name"])
-            inner_tabs.clear()
+            year_container, inner_tabs = self.add_year(year_data["name"], auto_populate=False)
+            
             for prop_data in year_data.get("properties", []):
                 self.create_property_sheet(
                     inner_tabs, 
@@ -141,7 +143,19 @@ class CertEditDialog(QDialog):
                 )
         return True
 
-    def add_year(self, name=None):
+    def handle_add_and_rename_year(self):
+        _, _ = self.add_year()
+        
+        new_tab_index = self.year_tabs.count() - 1
+        
+        self.year_tabs.setCurrentIndex(new_tab_index)
+        
+        success = self.prompt_rename_year(new_tab_index)
+        
+        if not success:
+            self.year_tabs.removeTab(new_tab_index)
+
+    def add_year(self, name=None, auto_populate=True):
         year_container = QWidget()
         year_layout = QVBoxLayout(year_container)
         
@@ -160,7 +174,8 @@ class CertEditDialog(QDialog):
         if new_index == 0:
             self.year_tabs.tabBar().setTabButton(0, QTabBar.RightSide, None)
 
-        self.create_property_sheet(inner_tabs)
+        if auto_populate:
+            self.create_property_sheet(inner_tabs)
 
         return year_container, inner_tabs
 
@@ -175,8 +190,11 @@ class CertEditDialog(QDialog):
         property_widget = QWidget()
         layout = QVBoxLayout(property_widget)
 
-        column_labels = headers if headers else ["Range", "Mess. Value", "Ref Value"]
-        table = QTableWidget(50, len(column_labels))
+        column_labels = headers if headers else ["Range", "Mess. Value", "Ref Value", "Error", "Error Uncertanty"]
+        
+        starting_rows = max(50, len(data) if data else 0)
+        
+        table = QTableWidget(starting_rows, len(column_labels))
         table.setHorizontalHeaderLabels(column_labels)
 
         table.horizontalHeader().setContextMenuPolicy(Qt.CustomContextMenu)
@@ -195,18 +213,18 @@ class CertEditDialog(QDialog):
         if name is None:
             name = f"Property {inner_tabs.count() + 1}"
             
-        new_index = inner_tabs.addTab(property_widget, name)
-
-        if new_index == 0:
-            inner_tabs.tabBar().setTabButton(0, QTabBar.RightSide, None)
+        inner_tabs.addTab(property_widget, name)
+        
+        self._refresh_tab_close_buttons(inner_tabs)
 
     def show_header_menu(self, pos, table):
         column_index = table.horizontalHeader().logicalIndexAt(pos)
+        
+        if column_index < 0:
+            return
 
         menu = QMenu(self)
-
         add_act = menu.addAction("Insert Column Right")
-
         rem_act = menu.addAction("Remove This Column")
         menu.addSeparator()
 
@@ -241,10 +259,33 @@ class CertEditDialog(QDialog):
         return False
 
     def rename_year_tab(self, index):
+        self.prompt_rename_year(index)
+
+    def prompt_rename_year(self, index):
         current_text = self.year_tabs.tabText(index)
-        new_text, ok = QInputDialog.getText(self, "Rename Year", "Enter new name:", text=current_text)
-        if ok and new_text.strip():
-            self.year_tabs.setTabText(index, new_text.strip())
+        
+        while True:
+            new_text, ok = QInputDialog.getText(
+                self, 
+                "Rename Year", 
+                "Enter new year (numbers only):", 
+                text=current_text
+            )
+            
+            if not ok:
+                return False
+                
+            cleaned_text = new_text.strip()
+            
+            if cleaned_text.isdigit():
+                self.year_tabs.setTabText(index, cleaned_text)
+                return True
+            else:
+                QMessageBox.warning(
+                    self, 
+                    "Invalid Format", 
+                    "Year designations must contain numbers only (e.g., 2026)."
+                )
 
     def rename_property_tab(self, index, inner_tabs):
         current_text = inner_tabs.tabText(index)
@@ -254,11 +295,29 @@ class CertEditDialog(QDialog):
 
     def remove_year(self, index):
         if self.year_tabs.count() > 1:
+            widget_to_delete = self.year_tabs.widget(index)
             self.year_tabs.removeTab(index)
+            if widget_to_delete:
+                widget_to_delete.deleteLater()
+            
+            self._refresh_tab_close_buttons(self.year_tabs)
 
     def remove_property(self, index, inner_tabs):
         if inner_tabs.count() > 1:
+            widget_to_delete = inner_tabs.widget(index)
             inner_tabs.removeTab(index)
+            if widget_to_delete:
+                widget_to_delete.deleteLater()
+                
+            self._refresh_tab_close_buttons(inner_tabs)
+
+    def _refresh_tab_close_buttons(self, tab_widget):
+        tab_bar = tab_widget.tabBar()
+        
+        for i in range(tab_widget.count()):
+            btn = tab_bar.tabButton(i, QTabBar.RightSide)
+            if btn:
+                btn.setVisible(i != 0)
 
 class CertificateDialog(QDialog):
     def __init__(self, parent=None):
@@ -314,12 +373,9 @@ class DisplayDataDialog(QDialog):
 
         self.cert_data = data_manager.fetch_certificate_data(file_path)
 
-        self.label = QLabel("Select a year to display:")
-        layout.addWidget(self.label)
-
-        self.combo_years = QComboBox()
-        layout.addWidget(self.combo_years)
-        layout.addSpacing(10)
+        self.latest_year = None
+        if self.cert_data and self.cert_data.keys():
+            self.latest_year = list(self.cert_data.keys())[-1]
 
         self.label_prop = QLabel("Select a property:")
         layout.addWidget(self.label_prop)
@@ -351,100 +407,106 @@ class DisplayDataDialog(QDialog):
         self.btn_close.clicked.connect(self.reject)
         layout.addWidget(self.btn_close)
 
-        self.combo_years.currentTextChanged.connect(self.display_properties)
         self.combo_properties.currentTextChanged.connect(self.display_headers)
         self.combo_headers.currentTextChanged.connect(self.display_values)
 
-        self.display_years(file_path)
-        ideal_size = self.sizeHint()
-        self.setFixedSize(500, ideal_size.height())
+        self.initialize_properties()
+        self.setMinimumWidth(500)
 
-    def display_years(self, file_path):
-        if not self.cert_data:
-            self.combo_years.addItem("No data found")
-            self.combo_years.setEnabled(False)
+
+    def initialize_properties(self):
+        if not self.latest_year:
+            self.combo_properties.addItem("No data found")
             self.combo_properties.setEnabled(False)
             self.combo_headers.setEnabled(False)
+            self.combo_values.setEnabled(False)
             return
 
-        names = sorted(self.cert_data.keys())
-        self.combo_years.addItems(names)
-
-    def display_properties(self, selected_year):
-        self.combo_properties.clear()
-
-        year_entry = self.cert_data.get(selected_year, {})
+        year_entry = self.cert_data.get(self.latest_year, {})
         properties_list = year_entry.get("properties", [])
         property_names = [prop.get("name") for prop in properties_list if "name" in prop]
 
+        self.combo_properties.blockSignals(True)
+        self.combo_properties.clear()
         if property_names:
             self.combo_properties.addItems(property_names)
+            self.combo_properties.blockSignals(False)
+            self.display_headers(self.combo_properties.currentText())
         else:
             self.combo_properties.addItem("No properties found")
+            self.combo_properties.blockSignals(False)
 
     def display_headers(self, selected_property):
-        self.combo_headers.clear()
-
         if not selected_property or selected_property == "No properties found":
              return 
         
-        selected_year = self.combo_years.currentText()
-        year_entry = self.cert_data.get(selected_year, {})
+        year_entry = self.cert_data.get(self.latest_year, {})
         properties_list = year_entry.get("properties", [])
 
         target_property = next((prop for prop in properties_list if prop.get("name") == selected_property), None)
 
+        self.combo_headers.blockSignals(True)
+        self.combo_headers.clear()
+        
         if target_property:
             headers = target_property.get("headers", [])
             if headers:
                 self.combo_headers.addItems(headers)
+                self.combo_headers.blockSignals(False)
+                self.display_values(self.combo_headers.currentText())
             else:
                 self.combo_headers.addItem("No headers found")
+                self.combo_headers.blockSignals(False)
 
     def display_values(self, selected_header):
-        """Populates the values combobox based on the selected header column."""
-        self.combo_values.clear()
-
         if not selected_header or selected_header == "No headers found":
             return
 
-        selected_year = self.combo_years.currentText()
         selected_property = self.combo_properties.currentText()
 
         unique_values = data_manager.get_unique_column_values(
             self.cert_data, 
-            selected_year, 
+            self.latest_year, 
             selected_property, 
             selected_header
         )
 
+        self.combo_values.blockSignals(True)
+        self.combo_values.clear()
+        
         if unique_values:
             self.combo_values.addItems(unique_values)
         else:
             self.combo_values.addItem("No values found")
+            
+        self.combo_values.blockSignals(False)
 
     def handle_selection(self):
-        selected_year = self.combo_years.currentText()
-        selected_property = self.combo_properties.currentText()
-        selected_header = self.combo_headers.currentText()
-        selected_value = self.combo_values.currentText()
-
-        print(f"User selected: {selected_year}, {selected_property}, {selected_header}")
-
-        matching_row = data_manager.find_matching_row(
+        target_prop = self.combo_properties.currentText()
+        target_head = self.combo_headers.currentText()
+        target_val = self.combo_values.currentText()
+        
+        self.final_graph_data = data_manager.get_historical_graph_data(
             self.cert_data, 
-            selected_year, 
-            selected_property, 
-            selected_header, 
-            selected_value
+            target_prop, 
+            target_head, 
+            target_val
         )
-
-        if matching_row:
-            print(f"--- MATCHING ROW FOUND ---")
-            print(matching_row)
+        
+        print(f"--- GRAPH DATA PREPARED VIA DATA_MANAGER ---")
+        print(f"Resulting Nested Dictionary: {self.final_graph_data}")
+        
+        if self.final_graph_data:
+            graph_dialog = graph_view.ErrorGraphDialog(
+                graph_data=self.final_graph_data, 
+                error_col_name="Error",
+                uncert_col_name="Error Uncertanty",
+                parent=self
+            )
+            graph_dialog.exec()
         else:
-            print("No matching row found in the data.")
+            print("No data found to graph!")
 
-        # 4. Close the dialog
         self.accept()
 
+    
